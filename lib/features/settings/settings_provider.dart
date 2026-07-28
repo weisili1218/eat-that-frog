@@ -12,6 +12,7 @@ class SettingsState {
     required this.weeklyEnabled,
     required this.weeklyReview,
     required this.leaveEnabled,
+    required this.language,
     this.loaded = false,
   });
 
@@ -19,6 +20,7 @@ class SettingsState {
   final bool weeklyEnabled;
   final TimeOfDay weeklyReview;
   final bool leaveEnabled;
+  final AppLocale language;
   final bool loaded;
 
   static const _defaults = SettingsState(
@@ -28,6 +30,7 @@ class SettingsState {
     weeklyReview:
         TimeOfDay(hour: AppConfig.weeklyReviewHour, minute: AppConfig.weeklyReviewMinute),
     leaveEnabled: false,
+    language: AppLocale.zh,
   );
 
   SettingsState copyWith({
@@ -35,6 +38,7 @@ class SettingsState {
     bool? weeklyEnabled,
     TimeOfDay? weeklyReview,
     bool? leaveEnabled,
+    AppLocale? language,
     bool? loaded,
   }) {
     return SettingsState(
@@ -42,6 +46,7 @@ class SettingsState {
       weeklyEnabled: weeklyEnabled ?? this.weeklyEnabled,
       weeklyReview: weeklyReview ?? this.weeklyReview,
       leaveEnabled: leaveEnabled ?? this.leaveEnabled,
+      language: language ?? this.language,
       loaded: loaded ?? this.loaded,
     );
   }
@@ -68,6 +73,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         minute: p.getInt(AppConfig.prefWeeklyMinute) ?? AppConfig.weeklyReviewMinute,
       ),
       leaveEnabled: p.getBool(AppConfig.prefLeaveEnabled) ?? false,
+      language: (p.getString(AppConfig.prefLanguage) ?? 'zh') == 'en'
+          ? AppLocale.en
+          : AppLocale.zh,
       loaded: true,
     );
   }
@@ -93,13 +101,21 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = state.copyWith(leaveEnabled: v);
     await _prefs?.setBool(AppConfig.prefLeaveEnabled, v);
   }
+
+  Future<void> setLanguage(AppLocale l) async {
+    state = state.copyWith(language: l);
+    await _prefs?.setString(AppConfig.prefLanguage, l.name);
+  }
 }
 
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, SettingsState>((ref) => SettingsNotifier());
 
-/// Formats a [TimeOfDay] like the design ("上午 9:00" / "週日 晚上 8:00" handled
-/// at the call site).
+/// The active string table, following the language setting.
+final stringsProvider = Provider<AppStrings>((ref) {
+  return AppStrings.forLocale(ref.watch(settingsProvider).language);
+});
+
 String formatTime(TimeOfDay t) {
   final h24 = t.hour;
   final period = h24 < 12 ? '上午' : '下午';

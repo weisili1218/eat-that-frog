@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,6 +12,11 @@ class TasksRemote {
   SupabaseClient get _c => SupabaseService.instance.client;
   String? get _userId => SupabaseService.instance.user?.id;
 
+  static String _dateStr(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
   static Map<String, dynamic> toJson(Task t, String userId) => {
         'id': t.id,
         'user_id': userId,
@@ -18,6 +25,10 @@ class TasksRemote {
         'is_frog': t.isFrog,
         'ever_frog': t.everFrog,
         'bucket': t.bucket.name,
+        'difficulty': t.difficulty.name,
+        'due_date': t.dueDate == null ? null : _dateStr(t.dueDate!),
+        'reminder_time': t.reminderTime,
+        'subtasks': jsonDecode(t.subtasks.isEmpty ? '[]' : t.subtasks),
         'completed_at': t.completedAt?.toUtc().toIso8601String(),
         'deleted': t.deleted,
         'created_at': t.createdAt.toUtc().toIso8601String(),
@@ -31,7 +42,12 @@ class TasksRemote {
       note: Value(j['note'] as String?),
       isFrog: Value(j['is_frog'] as bool? ?? false),
       everFrog: Value(j['ever_frog'] as bool? ?? false),
-      bucket: Value(_bucket(j['bucket'] as String?)),
+      bucket: Value(_enum(TaskBucket.values, j['bucket'], TaskBucket.inbox)),
+      difficulty:
+          Value(_enum(Difficulty.values, j['difficulty'], Difficulty.medium)),
+      dueDate: Value(_date(j['due_date'])),
+      reminderTime: Value(j['reminder_time'] as String?),
+      subtasks: Value(jsonEncode(j['subtasks'] ?? const [])),
       completedAt: Value(_dt(j['completed_at'])),
       deleted: Value(j['deleted'] as bool? ?? false),
       createdAt: Value(_dt(j['created_at']) ?? DateTime.now()),
@@ -47,7 +63,6 @@ class TasksRemote {
     await _c.from('tasks').upsert(tasks.map((t) => toJson(t, uid)).toList());
   }
 
-  /// Rows changed at/after [since] (all rows when null).
   Future<List<Map<String, dynamic>>> fetchSince(DateTime? since) async {
     final uid = _userId;
     if (uid == null) return const [];
@@ -59,10 +74,12 @@ class TasksRemote {
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
-  static TaskBucket _bucket(String? name) =>
-      TaskBucket.values.firstWhere((b) => b.name == name,
-          orElse: () => TaskBucket.inbox);
+  static T _enum<T extends Enum>(List<T> values, dynamic name, T fallback) =>
+      values.firstWhere((e) => e.name == name, orElse: () => fallback);
 
   static DateTime? _dt(dynamic v) =>
       v == null ? null : DateTime.parse(v as String).toLocal();
+
+  static DateTime? _date(dynamic v) =>
+      v == null ? null : DateTime.parse(v as String);
 }

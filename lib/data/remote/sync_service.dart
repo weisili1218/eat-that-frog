@@ -1,26 +1,19 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:drift/drift.dart' show Value;
 
 import '../local/database.dart';
-import 'records_remote.dart';
+import 'completions_remote.dart';
 import 'supabase_client.dart';
 import 'tasks_remote.dart';
 
-/// Coordinates offline-first sync with Supabase.
-///
-/// Strategy (per spec):
-/// - All writes go to Drift first and are flagged `pendingSync`.
-/// - When online + signed in, pending rows are pushed (async, non-blocking).
-/// - Remote changes are pulled and merged Last-Write-Wins on `updatedAt`.
-/// - Connectivity regain and sign-in both trigger a full sync.
+/// Coordinates offline-first sync with Supabase (local-first + Last-Write-Wins).
 class SyncService {
   SyncService(this._db);
 
   final AppDatabase _db;
   final _tasksRemote = TasksRemote();
-  final _recordsRemote = RecordsRemote();
+  final _completionsRemote = CompletionsRemote();
 
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   StreamSubscription<dynamic>? _authSub;
@@ -39,7 +32,6 @@ class SyncService {
       if (online) syncNow();
     });
 
-    // Sync right after sign-in (push local first, then pull).
     _authSub = SupabaseService.instance.client.auth.onAuthStateChange.listen((_) {
       if (SupabaseService.instance.isSignedIn) syncNow();
     });
@@ -47,14 +39,12 @@ class SyncService {
     if (_canSync) syncNow();
   }
 
-  /// Debounced push, invoked by repositories after each local write.
   Future<void> requestPush() async {
     if (!_canSync) return;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 600), _pushPending);
   }
 
-  /// Full sync: push local changes, then pull remote.
   Future<void> syncNow() async {
     if (!_canSync || _syncing) return;
     _syncing = true;
@@ -78,11 +68,11 @@ class SyncService {
       }
     }
 
-    final pendingRecords = await _db.dailyRecordsDao.pendingSyncRows();
-    if (pendingRecords.isNotEmpty) {
-      await _recordsRemote.upsert(pendingRecords);
-      for (final r in pendingRecords) {
-        await _db.dailyRecordsDao.markSynced(r.id);
+    final pendingCompletions = await _db.completionsDao.pendingSyncRows();
+    if (pendingCompletions.isNotEmpty) {
+      await _completionsRemote.upsert(pendingCompletions);
+      for (final c in pendingCompletions) {
+        await _db.completionsDao.markSynced(c.id);
       }
     }
   }
@@ -94,23 +84,15 @@ class SyncService {
     for (final j in remoteTasks) {
       final companion = TasksRemote.fromJson(j);
       final local = await _db.tasksDao.getById(companion.id.value);
-      final remoteUpdated = companion.updatedAt.value;
-      if (local == null || remoteUpdated.isAfter(local.updatedAt)) {
+      if (local == null || companion.updatedAt.value.isAfter(local.updatedAt)) {
         await _db.tasksDao.upsert(companion);
       }
     }
 
-    final remoteRecords = await _recordsRemote.fetchSince(_lastPull);
-    for (final j in remoteRecords) {
-      final companion = RecordsRemote.fromJson(j);
-      final local = await _db.dailyRecordsDao.getForDate(companion.date.value);
-      final remoteUpdated = companion.updatedAt.value;
-      if (local == null || remoteUpdated.isAfter(local.updatedAt)) {
-        // Preserve the local id so (user,date) uniqueness stays stable.
-        await _db.dailyRecordsDao.upsert(
-          local == null ? companion : companion.copyWith(id: Value(local.id)),
-        );
-      }
+    final remoteCompletions = await _completionsRemote.fetchSince(_lastPull);
+    for (final j in remoteCompletions) {
+      final companion = CompletionsRemote.fromJson(j);
+      await _db.completionsDao.upsert(companion);
     }
 
     _lastPull = DateTime.now();

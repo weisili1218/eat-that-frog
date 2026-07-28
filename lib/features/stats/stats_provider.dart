@@ -2,11 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/enums.dart';
 import '../../data/local/database.dart';
-import '../../data/local/task_x.dart';
 import '../../data/providers.dart';
-import '../../data/repositories/record_repository.dart';
+import '../settings/settings_provider.dart';
 
-/// One bar in the 7-day chart.
 class DayBar {
   const DayBar({required this.label, required this.value, required this.isToday});
   final String label;
@@ -14,7 +12,6 @@ class DayBar {
   final bool isToday;
 }
 
-/// Everything the Stats page renders.
 class StatsData {
   const StatsData({
     required this.frogsEaten,
@@ -33,53 +30,64 @@ class StatsData {
   final List<DayBar> bars;
 }
 
+DateTime _day(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 bool _sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+/// All stats derive from the completions log + tasks (for frog-rate denominator).
 final statsProvider = Provider<StatsData>((ref) {
   final tasks = ref.watch(allTasksProvider).valueOrNull ?? const <Task>[];
-  final records = ref.watch(allRecordsProvider).valueOrNull ?? const <DailyRecord>[];
+  final completions =
+      ref.watch(allCompletionsProvider).valueOrNull ?? const <Completion>[];
+  final leaveEnabled = ref.watch(settingsProvider).leaveEnabled;
+
   final now = DateTime.now();
-  final today = RecordRepository.dayOf(now);
+  final today = _day(now);
 
-  final frogsEaten = tasks.where((t) => t.isFrog && t.done).length;
-  final tadpolesEaten = tasks
-      .where((t) => t.isTadpole && t.done && t.bucket != TaskBucket.inbox)
-      .length;
+  final frogsEaten =
+      completions.where((c) => c.type == CompletionType.frog).length;
+  final tadpolesEaten =
+      completions.where((c) => c.type == CompletionType.tadpole).length;
+
   final everFrog = tasks.where((t) => t.everFrog).length;
-  final frogRate = everFrog == 0 ? 0 : ((frogsEaten / everFrog) * 100).round();
+  final denom = everFrog == 0 ? 0 : (everFrog > frogsEaten ? everFrog : frogsEaten);
+  final frogRate = denom == 0 ? 0 : ((frogsEaten / denom) * 100).round();
 
-  final frogDoneToday = tasks.any((t) => t.isFrog && t.done);
+  bool frogOn(DateTime day) => completions.any(
+      (c) => c.type == CompletionType.frog && _sameDay(c.date, day));
+  final frogDoneToday = frogOn(today);
 
-  // Streak: prefer the recorded value; fall back to a live estimate.
-  DailyRecord? todayRec;
-  for (final r in records) {
-    if (_sameDay(r.date, today)) todayRec = r;
+  // Streak: consecutive days (ending today or yesterday) with a frog, with an
+  // optional single "leave" day forgiven per calendar month.
+  var streak = 0;
+  final leaveUsed = <String>{};
+  var cursor = today;
+  var guard = 0;
+  while (guard++ < 400) {
+    if (frogOn(cursor)) {
+      streak++;
+      cursor = _day(cursor.subtract(const Duration(days: 1)));
+      continue;
+    }
+    if (_sameDay(cursor, today)) {
+      cursor = _day(cursor.subtract(const Duration(days: 1)));
+      continue; // today not done yet — don't break
+    }
+    final monthKey = '${cursor.year}-${cursor.month}';
+    if (leaveEnabled && !leaveUsed.contains(monthKey)) {
+      leaveUsed.add(monthKey);
+      cursor = _day(cursor.subtract(const Duration(days: 1)));
+      continue;
+    }
+    break;
   }
-  final streak = todayRec?.currentStreak ?? (frogDoneToday ? 1 : 0);
-
-  // Completed-per-day for the last 7 days.
-  int completedToday =
-      tasks.where((t) => t.completedAt != null && _sameDay(t.completedAt!, now)).length;
 
   final bars = <DayBar>[];
   for (var i = 6; i >= 0; i--) {
-    final day = RecordRepository.dayOf(now.subtract(Duration(days: i)));
-    final isToday = i == 0;
-    int value;
-    if (isToday) {
-      value = completedToday;
-    } else {
-      value = records
-          .where((r) => _sameDay(r.date, day))
-          .fold<int>(0, (a, r) => a + r.totalCompleted);
-    }
-    final label = i == 0
-        ? 'TODAY'
-        : i == 1
-            ? 'YDAY'
-            : '${i}d';
-    bars.add(DayBar(label: label, value: value, isToday: isToday));
+    final day = _day(now.subtract(Duration(days: i)));
+    final value = completions.where((c) => _sameDay(c.date, day)).length;
+    final label = i == 0 ? 'TODAY' : (i == 1 ? 'YDAY' : '${i}d');
+    bars.add(DayBar(label: label, value: value, isToday: i == 0));
   }
 
   return StatsData(

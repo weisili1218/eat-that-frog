@@ -3,12 +3,11 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 import '../../core/enums.dart';
 import 'tasks_dao.dart';
-import 'records_dao.dart';
+import 'completions_dao.dart';
 
 part 'database.g.dart';
 
-/// A task. Drift generates the row class `Task` and `TasksCompanion`, which
-/// double as the app's domain model (matching the spec's `Task` fields).
+/// A task. Drift generates the row class `Task` and `TasksCompanion`.
 class Tasks extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
@@ -16,64 +15,88 @@ class Tasks extends Table {
   BoolColumn get isFrog => boolean().withDefault(const Constant(false))();
   BoolColumn get everFrog => boolean().withDefault(const Constant(false))();
 
-  /// Stored as the enum name: inbox | today | later | someday.
+  /// inbox | today | later | someday (v2 uses inbox/today).
   TextColumn get bucket =>
       textEnum<TaskBucket>().withDefault(const Constant('inbox'))();
+
+  /// easy | medium | hard.
+  TextColumn get difficulty =>
+      textEnum<Difficulty>().withDefault(const Constant('medium'))();
+
+  /// Optional deadline (date only) and reminder time ('HH:mm').
+  DateTimeColumn get dueDate => dateTime().nullable()();
+  TextColumn get reminderTime => text().nullable()();
+
+  /// JSON array of {id,title,done}. See [Subtask].
+  TextColumn get subtasks => text().withDefault(const Constant('[]'))();
 
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get completedAt => dateTime().nullable()();
 
-  /// Owner once signed in; null in local-only mode.
   TextColumn get userId => text().nullable()();
-
-  /// Soft-delete flag so deletions propagate through sync.
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();
-
-  /// True when local changes have not yet been pushed to Supabase.
   BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
 }
 
-/// One row per calendar day. Drift generates `DailyRecord`.
-class DailyRecords extends Table {
+/// One row per completion (frog / tadpole). Drives all stats + the streak and
+/// survives day resets. Drift generates the row class `Completion`.
+class Completions extends Table {
   TextColumn get id => text()();
 
-  /// Normalized to local midnight.
+  /// Local midnight of the day the completion happened.
   DateTimeColumn get date => dateTime()();
 
-  BoolColumn get frogCompleted =>
-      boolean().withDefault(const Constant(false))();
-  IntColumn get totalCompleted => integer().withDefault(const Constant(0))();
-  IntColumn get currentStreak => integer().withDefault(const Constant(0))();
+  /// frog | tadpole.
+  TextColumn get type => textEnum<CompletionType>()();
+
+  TextColumn get taskId => text().nullable()();
 
   TextColumn get userId => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
+  BoolColumn get deleted => boolean().withDefault(const Constant(false))();
   BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
-
-  @override
-  List<Set<Column>> get uniqueKeys => [
-        {date, userId},
-      ];
 }
 
 @DriftDatabase(
-  tables: [Tasks, DailyRecords],
-  daos: [TasksDao, DailyRecordsDao],
+  tables: [Tasks, Completions],
+  daos: [TasksDao, CompletionsDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_open());
 
-  /// For unit tests: `AppDatabase.forTesting(NativeDatabase.memory())`.
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(tasks, tasks.difficulty);
+            await m.addColumn(tasks, tasks.dueDate);
+            await m.addColumn(tasks, tasks.reminderTime);
+            await m.addColumn(tasks, tasks.subtasks);
+            await m.createTable(completions);
+            // Fold the removed later/someday buckets into inbox.
+            await customStatement(
+              "UPDATE tasks SET bucket = 'inbox' "
+              "WHERE bucket IN ('later','someday')",
+            );
+            // daily_records is no longer used.
+            await customStatement('DROP TABLE IF EXISTS daily_records');
+          }
+        },
+      );
 
   static QueryExecutor _open() => driftDatabase(name: 'eat_that_frog');
 }

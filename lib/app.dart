@@ -4,15 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/navigation.dart';
 import 'core/theme.dart';
 import 'data/notifications/notification_provider.dart';
-import 'data/streak_controller.dart';
 import 'features/today/today_page.dart';
 import 'features/inbox/inbox_page.dart';
 import 'features/stats/stats_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/inbox/inbox_provider.dart';
+import 'features/settings/settings_provider.dart';
 import 'shared/widgets/tab_bar.dart';
 
-/// Root scaffold hosting the 4 tabs and the frosted bottom bar.
+/// Root scaffold: 3 tabs, frosted bottom bar, a gear icon, and the Settings
+/// overlay.
 class RootShell extends ConsumerWidget {
   const RootShell({super.key});
 
@@ -20,8 +21,8 @@ class RootShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tab = ref.watch(currentTabProvider);
     final inboxCount = ref.watch(inboxCountProvider);
-    // Keep the streak controller alive (recompute on changes / midnight / resume).
-    ref.watch(streakControllerProvider);
+    final settingsOpen = ref.watch(settingsOpenProvider);
+    final s = ref.watch(stringsProvider);
     // Keep notifications scheduled in sync with settings.
     ref.watch(notificationSchedulerProvider);
 
@@ -32,14 +33,19 @@ class RootShell extends ConsumerWidget {
           Positioned.fill(
             child: IndexedStack(
               index: tab.index,
-              children: const [
-                TodayPage(),
-                InboxPage(),
-                StatsPage(),
-                SettingsPage(),
-              ],
+              children: const [TodayPage(), InboxPage(), StatsPage()],
             ),
           ),
+
+          // Gear icon (top-right) — opens the Settings overlay.
+          Positioned(
+            top: 58,
+            right: 20,
+            child: _GearButton(
+              onTap: () => ref.read(settingsOpenProvider.notifier).state = true,
+            ),
+          ),
+
           Positioned(
             left: 0,
             right: 0,
@@ -48,46 +54,34 @@ class RootShell extends ConsumerWidget {
               current: tab,
               onSelect: (t) => ref.read(currentTabProvider.notifier).state = t,
               hasInbox: inboxCount > 0,
+              strings: s,
             ),
           ),
+
+          if (settingsOpen) const Positioned.fill(child: SettingsOverlay()),
         ],
       ),
     );
   }
 }
 
-/// Shared header used by every tab: mono eyebrow + Fraunces title.
-class TabHeader extends StatelessWidget {
-  const TabHeader({
-    super.key,
-    required this.eyebrow,
-    required this.title,
-    this.trailing,
-  });
-
-  final String eyebrow;
-  final String title;
-  final Widget? trailing;
+class _GearButton extends StatelessWidget {
+  const _GearButton({required this.onTap});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 58, 20, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(eyebrow, style: AppText.mono()),
-                const SizedBox(height: 6),
-                Text(title, style: AppText.title()),
-              ],
-            ),
-          ),
-          if (trailing != null) trailing!,
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppColors.ivoryL,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.ivoryD),
+        ),
+        child: const Icon(Icons.settings_outlined, size: 16, color: AppColors.ink),
       ),
     );
   }

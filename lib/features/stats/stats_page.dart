@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../shared/animations/fade_up.dart';
+import '../settings/settings_provider.dart';
 import 'stats_provider.dart';
 
 class StatsPage extends ConsumerWidget {
@@ -12,7 +13,7 @@ class StatsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const s = AppStrings.zh;
+    final s = ref.watch(stringsProvider);
     final data = ref.watch(statsProvider);
 
     return ColoredBox(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'enums.dart';
+
 /// Design tokens for「先吃掉那隻青蛙 × GTD」.
 ///
 /// Extracted directly from the design spec. Treat these as the single source
@@ -37,7 +39,19 @@ class AppColors {
 
   /// 頁面外圈背景（iOS 裝置外框）
   static const page = Color(0xFFEDEAE3);
+
+  // ---- Difficulty (取自原型 DIFF_COLORS) ----
+  static const diffEasy = Color(0xFF3F8F5F);
+  static const diffMedium = Color(0xFFB5502E); // == accent
+  static const diffHard = Color(0xFFA8383D);
 }
+
+/// Maps a [Difficulty] to its pill colour.
+Color difficultyColor(Difficulty d) => switch (d) {
+      Difficulty.easy => AppColors.diffEasy,
+      Difficulty.medium => AppColors.diffMedium,
+      Difficulty.hard => AppColors.diffHard,
+    };
 
 /// Named text styles. Fonts:
 /// - Fraunces (serif) → 大標題、青蛙任務文字、統計數字

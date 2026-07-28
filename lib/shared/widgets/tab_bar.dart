@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 
-enum AppTab { today, inbox, stats, settings }
+enum AppTab { today, inbox, stats }
 
-/// Bottom tab bar with frosted-glass effect.
-/// background rgba(250,248,243,0.92) + blur(14), border-top ivoryD.
-/// Active = accent, inactive = cloud. Inbox shows a red dot when [hasInbox].
+/// Bottom tab bar (3 tabs) with frosted-glass effect. Settings is opened via a
+/// gear icon, not a tab.
 class FrostedTabBar extends StatelessWidget {
   const FrostedTabBar({
     super.key,
@@ -30,7 +29,7 @@ class FrostedTabBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 24),
           decoration: const BoxDecoration(
-            color: Color(0xEBFAF8F3), // rgba(250,248,243,0.92)
+            color: Color(0xEBFAF8F3),
             border: Border(top: BorderSide(color: AppColors.ivoryD)),
           ),
           child: Row(
@@ -54,12 +53,6 @@ class FrostedTabBar extends StatelessWidget {
                 onTap: () => onSelect(AppTab.stats),
                 icon: _statsIcon,
               ),
-              _TabItem(
-                label: strings['settingsTab'],
-                active: current == AppTab.settings,
-                onTap: () => onSelect(AppTab.settings),
-                icon: _settingsIcon,
-              ),
             ],
           ),
         ),
@@ -73,8 +66,6 @@ class FrostedTabBar extends StatelessWidget {
       CustomPaint(size: const Size(21, 21), painter: _InboxPainter(c));
   static Widget _statsIcon(Color c) =>
       CustomPaint(size: const Size(21, 21), painter: _StatsPainter(c));
-  static Widget _settingsIcon(Color c) =>
-      CustomPaint(size: const Size(21, 21), painter: _SettingsPainter(c));
 }
 
 class _TabItem extends StatelessWidget {
@@ -112,20 +103,12 @@ class _TabItem extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     label,
-                    style: AppText.mono(
-                      size: 9.5,
-                      color: color,
-                      letterSpacing: 0.04,
-                    ),
+                    style: AppText.mono(size: 9.5, color: color, letterSpacing: 0.04),
                   ),
                 ],
               ),
               if (showDot)
-                const Positioned(
-                  top: 0,
-                  right: 22,
-                  child: _Dot(),
-                ),
+                const Positioned(top: 0, right: 22, child: _Dot()),
             ],
           ),
         ),
@@ -140,14 +123,9 @@ class _Dot extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         width: 6,
         height: 6,
-        decoration: const BoxDecoration(
-          color: AppColors.accent,
-          shape: BoxShape.circle,
-        ),
+        decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
       );
 }
-
-// ---- Icon painters (ported from the SVG paths in the prototype) ----
 
 class _TodayPainter extends CustomPainter {
   _TodayPainter(this.color);
@@ -166,11 +144,7 @@ class _TodayPainter extends CustomPainter {
       ),
       stroke,
     );
-    canvas.drawCircle(
-      Offset(10 * s, 10 * s),
-      2.6 * s,
-      Paint()..color = color,
-    );
+    canvas.drawCircle(Offset(10 * s, 10 * s), 2.6 * s, Paint()..color = color);
   }
 
   @override
@@ -233,25 +207,4 @@ class _StatsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _StatsPainter old) => old.color != color;
-}
-
-class _SettingsPainter extends CustomPainter {
-  _SettingsPainter(this.color);
-  final Color color;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width / 20;
-    canvas.drawCircle(
-      Offset(10 * s, 10 * s),
-      7 * s,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-    canvas.drawCircle(Offset(10 * s, 10 * s), 2.4 * s, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SettingsPainter old) => old.color != color;
 }

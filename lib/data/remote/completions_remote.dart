@@ -1,11 +1,12 @@
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/enums.dart';
 import '../local/database.dart';
 import 'supabase_client.dart';
 
-/// Maps between Drift [DailyRecord] rows and the Supabase `daily_records` table.
-class RecordsRemote {
+/// Maps between Drift [Completion] rows and the Supabase `completions` table.
+class CompletionsRemote {
   SupabaseClient get _c => SupabaseService.instance.client;
   String? get _userId => SupabaseService.instance.user?.id;
 
@@ -14,24 +15,29 @@ class RecordsRemote {
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
-  static Map<String, dynamic> toJson(DailyRecord r, String userId) => {
+  static Map<String, dynamic> toJson(Completion r, String userId) => {
         'id': r.id,
         'user_id': userId,
         'date': _dateStr(r.date),
-        'frog_completed': r.frogCompleted,
-        'total_completed': r.totalCompleted,
-        'current_streak': r.currentStreak,
+        'type': r.type.name,
+        'task_id': r.taskId,
+        'deleted': r.deleted,
+        'created_at': r.createdAt.toUtc().toIso8601String(),
         'updated_at': r.updatedAt.toUtc().toIso8601String(),
       };
 
-  static DailyRecordsCompanion fromJson(Map<String, dynamic> j) {
-    return DailyRecordsCompanion(
+  static CompletionsCompanion fromJson(Map<String, dynamic> j) {
+    return CompletionsCompanion(
       id: Value(j['id'] as String),
       date: Value(DateTime.parse(j['date'] as String)),
-      frogCompleted: Value(j['frog_completed'] as bool? ?? false),
-      totalCompleted: Value((j['total_completed'] as num?)?.toInt() ?? 0),
-      currentStreak: Value((j['current_streak'] as num?)?.toInt() ?? 0),
+      type: Value(CompletionType.values
+          .firstWhere((e) => e.name == j['type'], orElse: () => CompletionType.tadpole)),
+      taskId: Value(j['task_id'] as String?),
+      deleted: Value(j['deleted'] as bool? ?? false),
       userId: Value(j['user_id'] as String?),
+      createdAt: Value(j['created_at'] == null
+          ? DateTime.now()
+          : DateTime.parse(j['created_at'] as String).toLocal()),
       updatedAt: Value(j['updated_at'] == null
           ? DateTime.now()
           : DateTime.parse(j['updated_at'] as String).toLocal()),
@@ -39,21 +45,16 @@ class RecordsRemote {
     );
   }
 
-  Future<void> upsert(List<DailyRecord> records) async {
+  Future<void> upsert(List<Completion> rows) async {
     final uid = _userId;
-    if (uid == null || records.isEmpty) return;
-    // Conflict target is (user_id, date) — supabase upsert on primary key id is
-    // fine because we keep stable ids per (user, date) locally.
-    await _c.from('daily_records').upsert(
-          records.map((r) => toJson(r, uid)).toList(),
-          onConflict: 'user_id,date',
-        );
+    if (uid == null || rows.isEmpty) return;
+    await _c.from('completions').upsert(rows.map((r) => toJson(r, uid)).toList());
   }
 
   Future<List<Map<String, dynamic>>> fetchSince(DateTime? since) async {
     final uid = _userId;
     if (uid == null) return const [];
-    var query = _c.from('daily_records').select().eq('user_id', uid);
+    var query = _c.from('completions').select().eq('user_id', uid);
     if (since != null) {
       query = query.gte('updated_at', since.toUtc().toIso8601String());
     }

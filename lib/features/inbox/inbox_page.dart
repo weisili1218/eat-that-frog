@@ -1,45 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants.dart';
 import '../../core/enums.dart';
 import '../../core/theme.dart';
 import '../../data/local/database.dart';
+import '../../data/local/task_x.dart';
 import '../../data/providers.dart';
 import '../../shared/animations/fade_up.dart';
+import '../../shared/widgets/difficulty_pill.dart';
+import '../../shared/widgets/subtask_row.dart';
+import '../settings/settings_provider.dart';
 import 'inbox_provider.dart';
+import 'task_composer.dart';
 
-class InboxPage extends ConsumerStatefulWidget {
+class InboxPage extends ConsumerWidget {
   const InboxPage({super.key});
 
   @override
-  ConsumerState<InboxPage> createState() => _InboxPageState();
-}
-
-class _InboxPageState extends ConsumerState<InboxPage> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _add() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    await ref.read(taskRepositoryProvider).add(text, bucket: TaskBucket.inbox);
-    _controller.clear();
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const s = AppStrings.zh;
-    final inbox = ref.watch(inboxListProvider);
-    final later = ref.watch(laterListProvider);
-    final someday = ref.watch(somedayListProvider);
-    final repo = ref.read(taskRepositoryProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final list = ref.watch(inboxListProvider);
+    final sort = ref.watch(inboxSortProvider);
 
     return ColoredBox(
       color: AppColors.ivoryL,
@@ -59,220 +40,267 @@ class _InboxPageState extends ConsumerState<InboxPage> {
               ),
             ),
           ),
-
-          // Quick add
           FadeUp(
             index: 1,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      onSubmitted: (_) => _add(),
-                      textInputAction: TextInputAction.done,
-                      style: AppText.body15(),
-                      cursorColor: AppColors.accent,
-                      decoration: InputDecoration(
-                        hintText: s['inputPlaceholder'],
-                        hintStyle: AppText.body15(color: AppColors.cloud),
-                        isDense: true,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        filled: true,
-                        fillColor: AppColors.ivoryL,
-                        enabledBorder: _border(AppColors.ivoryD),
-                        focusedBorder: _border(AppColors.accent),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: AppColors.ink,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      onTap: _add,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-                        child: Text(s['addBtn'], style: AppText.button()),
-                      ),
-                    ),
+                  _NewTaskButton(label: s['newTaskBtn'], onTap: () => showTaskComposer(context)),
+                  const SizedBox(height: 10),
+                  _SortToggle(
+                    current: sort,
+                    strings: s,
+                    onSelect: (m) => ref.read(inboxSortProvider.notifier).state = m,
                   ),
                 ],
               ),
             ),
           ),
-
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
-              children: [
-                _sectionLabel(s['unsortedLabel']),
-                if (inbox.isEmpty) _emptyLine(s['inboxEmpty']),
-                for (var i = 0; i < inbox.length; i++)
-                  FadeUp(
-                    index: i,
-                    child: _UnsortedItem(
-                      task: inbox[i],
-                      strings: s,
-                      onToday: () => repo.setBucket(inbox[i].id, TaskBucket.today),
-                      onLater: () => repo.setBucket(inbox[i].id, TaskBucket.later),
-                      onSomeday: () => repo.setBucket(inbox[i].id, TaskBucket.someday),
-                      onDelete: () => repo.delete(inbox[i].id),
+            child: list.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      child: Text(s['inboxEmpty'], style: AppText.body15(color: AppColors.cloud)),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+                    itemCount: list.length,
+                    itemBuilder: (context, i) => FadeUp(
+                      index: i.clamp(0, 8),
+                      child: _InboxCard(task: list[i]),
                     ),
                   ),
-
-                const SizedBox(height: 16),
-                _sectionLabel(s['laterLabel']),
-                if (later.isEmpty) _emptyLine(s['laterEmpty']),
-                for (final t in later)
-                  _MoveRow(
-                    task: t,
-                    label: s['moveTodayBtn'],
-                    onMove: () => repo.setBucket(t.id, TaskBucket.today),
-                  ),
-
-                const SizedBox(height: 16),
-                _sectionLabel(s['somedayLabel']),
-                if (someday.isEmpty) _emptyLine(s['somedayEmpty']),
-                for (final t in someday)
-                  _MoveRow(
-                    task: t,
-                    label: s['moveTodayBtn'],
-                    onMove: () => repo.setBucket(t.id, TaskBucket.today),
-                  ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
-
-  static OutlineInputBorder _border(Color c) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.input),
-        borderSide: BorderSide(color: c),
-      );
-
-  Widget _sectionLabel(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(0, 10, 0, 6),
-        child: Text(text,
-            style: AppText.mono(size: 10.5, color: AppColors.cloud, letterSpacing: 0.12)),
-      );
-
-  Widget _emptyLine(String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Text(text, style: AppText.body15(color: AppColors.cloud)),
-      );
 }
 
-class _UnsortedItem extends StatelessWidget {
-  const _UnsortedItem({
-    required this.task,
-    required this.strings,
-    required this.onToday,
-    required this.onLater,
-    required this.onSomeday,
-    required this.onDelete,
-  });
-
+class _InboxCard extends ConsumerWidget {
+  const _InboxCard({required this.task});
   final Task task;
-  final AppStrings strings;
-  final VoidCallback onToday;
-  final VoidCallback onLater;
-  final VoidCallback onSomeday;
-  final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final repo = ref.read(taskRepositoryProvider);
+    final subs = task.subtaskList;
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 2),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.ivoryD)),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      decoration: BoxDecoration(
+        color: AppColors.ivoryL,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.ivoryD),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              DifficultyPill(difficulty: task.difficulty, strings: s),
+              const SizedBox(width: 10),
               Expanded(child: Text(task.title, style: AppText.body15())),
-              GestureDetector(
-                onTap: onDelete,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Text(strings['deleteBtn'],
-                      style: AppText.pill(color: AppColors.cloud)),
-                ),
+            ],
+          ),
+          if (task.hasMeta) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(_metaLine(task, s),
+                  style: AppText.mono(size: 10, color: AppColors.inkSoft, letterSpacing: 0.04)),
+            ),
+          ],
+          if (subs.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: AppColors.ivoryD),
+            const SizedBox(height: 4),
+            for (final sub in subs)
+              SubtaskRow(
+                subtask: sub,
+                boxSize: 16,
+                fontSize: 13,
+                onToggle: () => repo.toggleSubtask(task, sub.id),
+              ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _TextAction(
+                label: s['editBtn'],
+                color: AppColors.cloud,
+                onTap: () => showTaskComposer(context, editing: task),
+              ),
+              const SizedBox(width: 14),
+              _TextAction(
+                label: s['deleteBtn'],
+                color: AppColors.cloud,
+                onTap: () => repo.delete(task.id),
+              ),
+              const SizedBox(width: 14),
+              _TextAction(
+                label: '${s['today']} →',
+                color: AppColors.accent,
+                bold: true,
+                onTap: () => repo.setBucket(task.id, TaskBucket.today),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _Pill(label: strings['today'], onTap: onToday, primary: true),
-              const SizedBox(width: 8),
-              _Pill(label: strings['laterLabel'], onTap: onLater),
-              const SizedBox(width: 8),
-              _Pill(label: strings['somedayLabel'], onTap: onSomeday),
-            ],
-          ),
         ],
       ),
     );
   }
-}
 
-class _MoveRow extends StatelessWidget {
-  const _MoveRow({required this.task, required this.label, required this.onMove});
-
-  final Task task;
-  final String label;
-  final VoidCallback onMove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 2),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.ivoryD)),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: Text(task.title, style: AppText.body15())),
-          const SizedBox(width: 10),
-          _Pill(label: label, onTap: onMove),
-        ],
-      ),
-    );
+  String _metaLine(Task t, s) {
+    final parts = <String>[];
+    if (t.dueDate != null) {
+      parts.add('${s['dueLabel']} ${t.dueDate!.toIso8601String().substring(0, 10)}');
+    }
+    if (t.reminderTime != null) parts.add('${s['reminderLabel']} ${t.reminderTime}');
+    return parts.join(' · ');
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.onTap, this.primary = false});
-
+class _NewTaskButton extends StatelessWidget {
+  const _NewTaskButton({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
-  final bool primary;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: primary ? AppColors.ink : AppColors.ivoryD),
+      child: DottedBorderBox(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('+',
+                style: TextStyle(fontSize: 16, height: 1, color: AppColors.inkSoft)),
+            const SizedBox(width: 8),
+            Text(label, style: AppText.button(color: AppColors.inkSoft)),
+          ],
         ),
-        child: Text(
-          label,
-          style: AppText.pill(color: primary ? AppColors.ink : AppColors.inkSoft),
+      ),
+    );
+  }
+}
+
+/// A dashed-border container (Flutter has no native dashed border).
+class DottedBorderBox extends StatelessWidget {
+  const DottedBorderBox({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedPainter(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.ivoryD
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(14),
+    );
+    final path = Path()..addRRect(rrect);
+    const dash = 5.0, gap = 4.0;
+    for (final metric in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        canvas.drawPath(metric.extractPath(d, d + dash), paint);
+        d += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SortToggle extends StatelessWidget {
+  const _SortToggle({required this.current, required this.strings, required this.onSelect});
+  final InboxSort current;
+  final dynamic strings;
+  final ValueChanged<InboxSort> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.ivoryM,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: [
+          _seg(strings['sortCreated'], InboxSort.created),
+          _seg(strings['sortDifficulty'], InboxSort.difficulty),
+          _seg(strings['sortDue'], InboxSort.due),
+        ],
+      ),
+    );
+  }
+
+  Widget _seg(String label, InboxSort mode) {
+    final active = current == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onSelect(mode),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? AppColors.ivoryL : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            boxShadow: active
+                ? [BoxShadow(color: AppColors.ink.withValues(alpha: 0.12), blurRadius: 3, offset: const Offset(0, 1))]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: AppText.pill(color: active ? AppColors.ink : AppColors.cloud),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _TextAction extends StatelessWidget {
+  const _TextAction({required this.label, required this.color, required this.onTap, this.bold = false});
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Text(
+        label,
+        style: AppText.pill(color: color)
+            .copyWith(fontSize: 12.5, fontWeight: bold ? FontWeight.w600 : FontWeight.w500),
       ),
     );
   }
