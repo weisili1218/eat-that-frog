@@ -21,6 +21,8 @@ class InboxPage extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final list = ref.watch(inboxListProvider);
     final sort = ref.watch(inboxSortProvider);
+    final asc = ref.watch(inboxSortAscProvider);
+    final dueSoon = ref.watch(dueSoonCountProvider);
 
     return ColoredBox(
       color: AppColors.ivoryL,
@@ -46,12 +48,27 @@ class InboxPage extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Column(
                 children: [
+                  if (dueSoon > 0) ...[
+                    _DueSoonBanner(text: '$dueSoon ${s['dueSoonSuffix']}'),
+                    const SizedBox(height: 10),
+                  ],
                   _NewTaskButton(label: s['newTaskBtn'], onTap: () => showTaskComposer(context)),
                   const SizedBox(height: 10),
-                  _SortToggle(
-                    current: sort,
-                    strings: s,
-                    onSelect: (m) => ref.read(inboxSortProvider.notifier).state = m,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SortToggle(
+                          current: sort,
+                          strings: s,
+                          onSelect: (m) => ref.read(inboxSortProvider.notifier).state = m,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _SortDirButton(
+                        asc: asc,
+                        onTap: () => ref.read(inboxSortAscProvider.notifier).state = !asc,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -233,6 +250,48 @@ class _DashedPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _DueSoonBanner extends StatelessWidget {
+  const _DueSoonBanner({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accent),
+        ),
+        child: Text(
+          text,
+          style: AppText.body15(color: AppColors.accent).copyWith(fontWeight: FontWeight.w500, fontSize: 13),
+        ),
+      );
+}
+
+class _SortDirButton extends StatelessWidget {
+  const _SortDirButton({required this.asc, required this.onTap});
+  final bool asc;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.ivoryL,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.ivoryD),
+          ),
+          child: AnimatedRotation(
+            turns: asc ? 0 : 0.5,
+            duration: const Duration(milliseconds: 150),
+            child: const Icon(Icons.arrow_downward, size: 15, color: AppColors.ink),
+          ),
+        ),
+      );
 }
 
 class _SortToggle extends StatelessWidget {

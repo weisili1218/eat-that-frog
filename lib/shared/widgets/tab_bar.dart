@@ -3,22 +3,24 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 
-enum AppTab { today, inbox, stats }
+enum AppTab { today, inbox, stats, friends }
 
-/// Bottom tab bar (3 tabs) with frosted-glass effect. Settings is opened via a
-/// gear icon, not a tab.
+/// Bottom tab bar with frosted-glass effect. Settings is opened via a gear
+/// icon, not a tab. The Friends tab is shown only when enabled.
 class FrostedTabBar extends StatelessWidget {
   const FrostedTabBar({
     super.key,
     required this.current,
     required this.onSelect,
     required this.hasInbox,
+    this.showFriends = true,
     this.strings = AppStrings.zh,
   });
 
   final AppTab current;
   final ValueChanged<AppTab> onSelect;
   final bool hasInbox;
+  final bool showFriends;
   final AppStrings strings;
 
   @override
@@ -53,6 +55,13 @@ class FrostedTabBar extends StatelessWidget {
                 onTap: () => onSelect(AppTab.stats),
                 icon: _statsIcon,
               ),
+              if (showFriends)
+                _TabItem(
+                  label: strings['friendsTab'],
+                  active: current == AppTab.friends,
+                  onTap: () => onSelect(AppTab.friends),
+                  icon: _friendsIcon,
+                ),
             ],
           ),
         ),
@@ -66,6 +75,8 @@ class FrostedTabBar extends StatelessWidget {
       CustomPaint(size: const Size(21, 21), painter: _InboxPainter(c));
   static Widget _statsIcon(Color c) =>
       CustomPaint(size: const Size(21, 21), painter: _StatsPainter(c));
+  static Widget _friendsIcon(Color c) =>
+      CustomPaint(size: const Size(21, 21), painter: _FriendsPainter(c));
 }
 
 class _TabItem extends StatelessWidget {
@@ -207,4 +218,32 @@ class _StatsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _StatsPainter old) => old.color != color;
+}
+
+class _FriendsPainter extends CustomPainter {
+  _FriendsPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 20;
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(Offset(7 * s, 7 * s), 3 * s, stroke);
+    canvas.drawCircle(Offset(14 * s, 8 * s), 2.3 * s, stroke);
+    final p1 = Path()
+      ..moveTo(2 * s, 17 * s)
+      ..cubicTo(2 * s, 14 * s, 4.2 * s, 12 * s, 7 * s, 12 * s)
+      ..cubicTo(9.8 * s, 12 * s, 12 * s, 14 * s, 12 * s, 17 * s);
+    canvas.drawPath(p1, stroke);
+    final p2 = Path()
+      ..moveTo(12.5 * s, 12.3 * s)
+      ..cubicTo(14.5 * s, 12.6 * s, 16 * s, 14.3 * s, 16 * s, 17 * s);
+    canvas.drawPath(p2, stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FriendsPainter old) => old.color != color;
 }

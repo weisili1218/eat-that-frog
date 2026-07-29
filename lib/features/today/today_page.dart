@@ -13,6 +13,7 @@ import '../../shared/widgets/tab_bar.dart';
 import '../../shared/widgets/tadpole_row.dart';
 import '../settings/settings_provider.dart';
 import '../stats/stats_provider.dart';
+import 'focus_controller.dart';
 import 'today_provider.dart';
 
 class TodayPage extends ConsumerWidget {
@@ -25,7 +26,8 @@ class TodayPage extends ConsumerWidget {
     final tadpoles = ref.watch(todayTadpolesProvider);
     final isEmpty = ref.watch(todayEmptyProvider);
     final streak = ref.watch(statsProvider).streak;
-    final focusedId = ref.watch(focusedTaskProvider);
+    final focus = ref.watch(focusControllerProvider);
+    final focusedId = focus.taskId;
     final expandedId = ref.watch(expandedTaskProvider);
     final repo = ref.read(taskRepositoryProvider);
     final focusMode = focusedId != null;
@@ -66,9 +68,14 @@ class TodayPage extends ConsumerWidget {
             ),
           ),
 
-          if (focusMode) _FocusBanner(strings: s, onExit: () {
-            ref.read(focusedTaskProvider.notifier).state = null;
-          }),
+          if (focusMode)
+            _FocusBanner(
+              strings: s,
+              elapsed: focus.elapsed,
+              paused: focus.paused,
+              onPause: () => ref.read(focusControllerProvider.notifier).togglePause(),
+              onExit: () => ref.read(focusControllerProvider.notifier).stop(),
+            ),
 
           Expanded(
             child: ListView(
@@ -134,8 +141,7 @@ class TodayPage extends ConsumerWidget {
   }
 
   void _toggleFocus(WidgetRef ref, String id) {
-    final cur = ref.read(focusedTaskProvider);
-    ref.read(focusedTaskProvider.notifier).state = cur == id ? null : id;
+    ref.read(focusControllerProvider.notifier).start(id); // start() toggles off if same
   }
 
   void _toggleExpand(WidgetRef ref, String id) {
@@ -145,26 +151,59 @@ class TodayPage extends ConsumerWidget {
 }
 
 class _FocusBanner extends StatelessWidget {
-  const _FocusBanner({required this.strings, required this.onExit});
+  const _FocusBanner({
+    required this.strings,
+    required this.elapsed,
+    required this.paused,
+    required this.onPause,
+    required this.onExit,
+  });
   final dynamic strings;
+  final Duration elapsed;
+  final bool paused;
+  final VoidCallback onPause;
   final VoidCallback onExit;
+
+  String get _clock {
+    final m = elapsed.inMinutes.toString().padLeft(2, '0');
+    final sec = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$sec';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.ivoryM,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(strings['focusModeLabel'],
+          Text(paused ? strings['onBreakLabel'] : strings['focusModeLabel'],
               style: AppText.mono(size: 10, color: AppColors.accent, letterSpacing: 0.08)),
+          const SizedBox(width: 10),
+          Text(_clock,
+              style: AppText.mono(size: 13, color: AppColors.ink, letterSpacing: 0.04)),
+          const Spacer(),
+          GestureDetector(
+            onTap: onPause,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(color: AppColors.ivoryD),
+              ),
+              child: Text(paused ? strings['resumeFocusBtn'] : strings['pauseFocusBtn'],
+                  style: AppText.pill(color: AppColors.ink).copyWith(fontSize: 12)),
+            ),
+          ),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: onExit,
+            behavior: HitTestBehavior.opaque,
             child: Text(strings['exitFocus'], style: AppText.pill(color: AppColors.inkSoft)),
           ),
         ],

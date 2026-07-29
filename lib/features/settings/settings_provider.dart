@@ -13,6 +13,9 @@ class SettingsState {
     required this.weeklyReview,
     required this.leaveEnabled,
     required this.language,
+    required this.profileName,
+    required this.avatarColor,
+    required this.friendsEnabled,
     this.loaded = false,
   });
 
@@ -21,6 +24,9 @@ class SettingsState {
   final TimeOfDay weeklyReview;
   final bool leaveEnabled;
   final AppLocale language;
+  final String profileName;
+  final String avatarColor; // hex, e.g. #B5502E
+  final bool friendsEnabled;
   final bool loaded;
 
   static const _defaults = SettingsState(
@@ -31,6 +37,9 @@ class SettingsState {
         TimeOfDay(hour: AppConfig.weeklyReviewHour, minute: AppConfig.weeklyReviewMinute),
     leaveEnabled: false,
     language: AppLocale.zh,
+    profileName: '',
+    avatarColor: '#B5502E',
+    friendsEnabled: true,
   );
 
   SettingsState copyWith({
@@ -39,6 +48,9 @@ class SettingsState {
     TimeOfDay? weeklyReview,
     bool? leaveEnabled,
     AppLocale? language,
+    String? profileName,
+    String? avatarColor,
+    bool? friendsEnabled,
     bool? loaded,
   }) {
     return SettingsState(
@@ -47,6 +59,9 @@ class SettingsState {
       weeklyReview: weeklyReview ?? this.weeklyReview,
       leaveEnabled: leaveEnabled ?? this.leaveEnabled,
       language: language ?? this.language,
+      profileName: profileName ?? this.profileName,
+      avatarColor: avatarColor ?? this.avatarColor,
+      friendsEnabled: friendsEnabled ?? this.friendsEnabled,
       loaded: loaded ?? this.loaded,
     );
   }
@@ -76,8 +91,26 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       language: (p.getString(AppConfig.prefLanguage) ?? 'zh') == 'en'
           ? AppLocale.en
           : AppLocale.zh,
+      profileName: p.getString(AppConfig.prefProfileName) ?? '',
+      avatarColor: p.getString(AppConfig.prefAvatarColor) ?? '#B5502E',
+      friendsEnabled: p.getBool(AppConfig.prefFriendsEnabled) ?? true,
       loaded: true,
     );
+  }
+
+  Future<void> setProfileName(String name) async {
+    state = state.copyWith(profileName: name);
+    await _prefs?.setString(AppConfig.prefProfileName, name);
+  }
+
+  Future<void> setAvatarColor(String hex) async {
+    state = state.copyWith(avatarColor: hex);
+    await _prefs?.setString(AppConfig.prefAvatarColor, hex);
+  }
+
+  Future<void> setFriendsEnabled(bool v) async {
+    state = state.copyWith(friendsEnabled: v);
+    await _prefs?.setBool(AppConfig.prefFriendsEnabled, v);
   }
 
   Future<void> setDailyReminder(TimeOfDay t) async {

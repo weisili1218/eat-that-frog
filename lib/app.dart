@@ -7,24 +7,30 @@ import 'data/notifications/notification_provider.dart';
 import 'features/today/today_page.dart';
 import 'features/inbox/inbox_page.dart';
 import 'features/stats/stats_page.dart';
+import 'features/friends/friends_page.dart';
+import 'features/friends/profile_sync.dart';
 import 'features/settings/settings_page.dart';
 import 'features/inbox/inbox_provider.dart';
 import 'features/settings/settings_provider.dart';
 import 'shared/widgets/tab_bar.dart';
 
-/// Root scaffold: 3 tabs, frosted bottom bar, a gear icon, and the Settings
+/// Root scaffold: tabs, frosted bottom bar, a gear icon, and the Settings
 /// overlay.
 class RootShell extends ConsumerWidget {
   const RootShell({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tab = ref.watch(currentTabProvider);
+    var tab = ref.watch(currentTabProvider);
     final inboxCount = ref.watch(inboxCountProvider);
     final settingsOpen = ref.watch(settingsOpenProvider);
+    final friendsEnabled = ref.watch(settingsProvider).friendsEnabled;
     final s = ref.watch(stringsProvider);
-    // Keep notifications scheduled in sync with settings.
     ref.watch(notificationSchedulerProvider);
+    ref.watch(profileSyncProvider);
+
+    // If Friends is off but somehow selected, fall back to Today.
+    if (!friendsEnabled && tab == AppTab.friends) tab = AppTab.today;
 
     return Scaffold(
       backgroundColor: AppColors.ivoryL,
@@ -33,11 +39,14 @@ class RootShell extends ConsumerWidget {
           Positioned.fill(
             child: IndexedStack(
               index: tab.index,
-              children: const [TodayPage(), InboxPage(), StatsPage()],
+              children: const [
+                TodayPage(),
+                InboxPage(),
+                StatsPage(),
+                FriendsPage(),
+              ],
             ),
           ),
-
-          // Gear icon (top-right) — opens the Settings overlay.
           Positioned(
             top: 58,
             right: 20,
@@ -45,7 +54,6 @@ class RootShell extends ConsumerWidget {
               onTap: () => ref.read(settingsOpenProvider.notifier).state = true,
             ),
           ),
-
           Positioned(
             left: 0,
             right: 0,
@@ -54,10 +62,10 @@ class RootShell extends ConsumerWidget {
               current: tab,
               onSelect: (t) => ref.read(currentTabProvider.notifier).state = t,
               hasInbox: inboxCount > 0,
+              showFriends: friendsEnabled,
               strings: s,
             ),
           ),
-
           if (settingsOpen) const Positioned.fill(child: SettingsOverlay()),
         ],
       ),

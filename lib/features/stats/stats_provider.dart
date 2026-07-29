@@ -6,9 +6,17 @@ import '../../data/providers.dart';
 import '../settings/settings_provider.dart';
 
 class DayBar {
-  const DayBar({required this.label, required this.value, required this.isToday});
+  const DayBar({
+    required this.label,
+    required this.value,
+    required this.frogValue,
+    required this.tadpoleValue,
+    required this.isToday,
+  });
   final String label;
   final int value;
+  final int frogValue;
+  final int tadpoleValue;
   final bool isToday;
 }
 
@@ -85,9 +93,19 @@ final statsProvider = Provider<StatsData>((ref) {
   final bars = <DayBar>[];
   for (var i = 6; i >= 0; i--) {
     final day = _day(now.subtract(Duration(days: i)));
-    final value = completions.where((c) => _sameDay(c.date, day)).length;
+    final dayCompletions = completions.where((c) => _sameDay(c.date, day));
+    final frogValue =
+        dayCompletions.where((c) => c.type == CompletionType.frog).length;
+    final tadpoleValue =
+        dayCompletions.where((c) => c.type == CompletionType.tadpole).length;
     final label = i == 0 ? 'TODAY' : (i == 1 ? 'YDAY' : '${i}d');
-    bars.add(DayBar(label: label, value: value, isToday: i == 0));
+    bars.add(DayBar(
+      label: label,
+      value: frogValue + tadpoleValue,
+      frogValue: frogValue,
+      tadpoleValue: tadpoleValue,
+      isToday: i == 0,
+    ));
   }
 
   return StatsData(

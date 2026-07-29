@@ -114,9 +114,32 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxVal =
-        data.bars.map((b) => b.value).fold<int>(0, (a, b) => a > b ? a : b);
+    final maxVal = data.bars
+        .map((b) => b.frogValue > b.tadpoleValue ? b.frogValue : b.tadpoleValue)
+        .fold<int>(0, (a, b) => a > b ? a : b);
     final maxY = (maxVal < 1 ? 1 : maxVal).toDouble();
+
+    List<FlSpot> spots(int Function(DayBar) sel) => [
+          for (var i = 0; i < data.bars.length; i++)
+            FlSpot(i.toDouble(), sel(data.bars[i]).toDouble()),
+        ];
+
+    LineChartBarData line(List<FlSpot> s, Color color, double width) =>
+        LineChartBarData(
+          spots: s,
+          isCurved: true,
+          curveSmoothness: 0.28,
+          color: color,
+          barWidth: width,
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, pct, bar, i) => FlDotCirclePainter(
+              radius: 2.8,
+              color: color,
+              strokeWidth: 0,
+            ),
+          ),
+        );
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -125,28 +148,26 @@ class _ChartCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(strings['chartTitle'], style: AppText.cardTitle()),
-          const SizedBox(height: 18),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _LegendDot(color: AppColors.accent, label: strings['frogSectionLabel']),
+              const SizedBox(width: 14),
+              _LegendDot(color: AppColors.diffEasy, label: strings['othersLabel']),
+            ],
+          ),
+          const SizedBox(height: 14),
           SizedBox(
-            height: 130,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceBetween,
-                maxY: maxY * 1.25, // headroom for value labels
+            height: 110,
+            child: LineChart(
+              LineChartData(
+                minX: 0,
+                maxX: (data.bars.length - 1).toDouble(),
                 minY: 0,
+                maxY: maxY * 1.2 + 0.4,
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
-                barTouchData: BarTouchData(
-                  enabled: false,
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => Colors.transparent,
-                    tooltipPadding: EdgeInsets.zero,
-                    tooltipMargin: 4,
-                    getTooltipItem: (group, gi, rod, ri) => BarTooltipItem(
-                      '${data.bars[group.x.toInt()].value}',
-                      AppText.mono(size: 10.5, color: AppColors.inkSoft, letterSpacing: 0),
-                    ),
-                  ),
-                ),
+                lineTouchData: const LineTouchData(enabled: false),
                 titlesData: FlTitlesData(
                   show: true,
                   topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -155,7 +176,8 @@ class _ChartCard extends StatelessWidget {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 22,
+                      reservedSize: 20,
+                      interval: 1,
                       getTitlesWidget: (value, meta) {
                         final i = value.toInt();
                         if (i < 0 || i >= data.bars.length) return const SizedBox();
@@ -164,34 +186,16 @@ class _ChartCard extends StatelessWidget {
                           child: Text(
                             data.bars[i].label,
                             style: AppText.mono(
-                                size: 9, color: AppColors.cloud, letterSpacing: 0.05),
+                                size: 8.5, color: AppColors.cloud, letterSpacing: 0.05),
                           ),
                         );
                       },
                     ),
                   ),
                 ),
-                barGroups: [
-                  for (var i = 0; i < data.bars.length; i++)
-                    BarChartGroupData(
-                      x: i,
-                      showingTooltipIndicators: const [0],
-                      barRods: [
-                        BarChartRodData(
-                          toY: data.bars[i].value.toDouble(),
-                          width: 20,
-                          color: data.bars[i].isToday
-                              ? AppColors.accent
-                              : AppColors.chartBar,
-                          borderRadius: BorderRadius.circular(5),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY: maxY * 1.25,
-                            color: AppColors.ivoryM,
-                          ),
-                        ),
-                      ],
-                    ),
+                lineBarsData: [
+                  line(spots((b) => b.tadpoleValue), AppColors.diffEasy, 2),
+                  line(spots((b) => b.frogValue), AppColors.accent, 2.4),
                 ],
               ),
             ),
@@ -200,6 +204,20 @@ class _ChartCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+  final Color color;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(label, style: AppText.mono(size: 9.5, color: AppColors.inkSoft, letterSpacing: 0)),
+        ],
+      );
 }
 
 class _FrogRateCard extends StatelessWidget {

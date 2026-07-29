@@ -22,3 +22,6 @@ pubspec.lock
 *.env
 ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
+
+# Local Supabase creds (do not commit)
+scripts/run_local.sh

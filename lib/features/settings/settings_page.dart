@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../data/providers.dart';
 import '../auth/auth_page.dart';
 import '../auth/auth_provider.dart';
+import '../friends/models.dart';
 import 'settings_provider.dart';
 
 /// Full-screen Settings overlay (opened via the gear icon).
@@ -65,6 +66,20 @@ class SettingsOverlay extends ConsumerWidget {
                         await showAuthSheet(context);
                       }
                     },
+                  ),
+                ]),
+                const SizedBox(height: 16),
+
+                // Profile (nickname + avatar colour)
+                _ProfileCard(strings: s, settings: settings),
+                const SizedBox(height: 16),
+
+                // Friends tab toggle
+                _Card(children: [
+                  _SwitchRow(
+                    label: s['showFriendsToggleLabel'],
+                    value: settings.friendsEnabled,
+                    onChanged: (v) => ref.read(settingsProvider.notifier).setFriendsEnabled(v),
                   ),
                 ]),
                 const SizedBox(height: 16),
@@ -207,6 +222,112 @@ class SettingsOverlay extends ConsumerWidget {
       await ref.read(taskRepositoryProvider).resetAll();
       await ref.read(completionRepositoryProvider).resetAll();
     }
+  }
+}
+
+class _ProfileCard extends ConsumerStatefulWidget {
+  const _ProfileCard({required this.strings, required this.settings});
+  final AppStrings strings;
+  final SettingsState settings;
+  @override
+  ConsumerState<_ProfileCard> createState() => _ProfileCardState();
+}
+
+class _ProfileCardState extends ConsumerState<_ProfileCard> {
+  late final TextEditingController _name =
+      TextEditingController(text: widget.settings.profileName);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Color _hex(String h) {
+    final v = int.tryParse('FF${h.replaceAll('#', '')}', radix: 16);
+    return v == null ? AppColors.accent : Color(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.strings;
+    final selected = widget.settings.avatarColor;
+    final initial = _name.text.trim().isEmpty ? '?' : _name.text.trim()[0].toUpperCase();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.settingsCard),
+        border: Border.all(color: AppColors.ivoryD),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s['profileSectionLabel'],
+              style: AppText.mono(size: 9.5, color: AppColors.cloud, letterSpacing: 0.08)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: _hex(selected), shape: BoxShape.circle),
+                child: Text(initial,
+                    style: AppText.body(color: AppColors.ivoryL).copyWith(fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _name,
+                  onChanged: (v) {
+                    setState(() {});
+                    ref.read(settingsProvider.notifier).setProfileName(v);
+                  },
+                  style: AppText.body15(),
+                  cursorColor: AppColors.accent,
+                  decoration: InputDecoration(
+                    hintText: s['nicknameLabel'],
+                    hintStyle: AppText.body15(color: AppColors.cloud),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.ivoryD),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.accent),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final c in kAvatarColors)
+                GestureDetector(
+                  onTap: () => ref.read(settingsProvider.notifier).setAvatarColor(c),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: _hex(c),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected == c ? AppColors.ink : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
