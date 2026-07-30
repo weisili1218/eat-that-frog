@@ -33,6 +33,7 @@ class SocialRemote {
   Future<void> upsertMyProfile({
     String? displayName,
     String? avatarColor,
+    String? avatarUrl,
     int? streak,
     int? frogsEaten,
   }) =>
@@ -43,6 +44,7 @@ class SocialRemote {
         };
         if (displayName != null) data['display_name'] = displayName;
         if (avatarColor != null) data['avatar_color'] = avatarColor;
+        if (avatarUrl != null) data['avatar_url'] = avatarUrl;
         if (streak != null) data['streak'] = streak;
         if (frogsEaten != null) data['frogs_eaten'] = frogsEaten;
         await _c.from('profiles').upsert(data);
@@ -180,5 +182,25 @@ class SocialRemote {
           'user_id': uid,
           'text': text,
         });
+      }, null);
+
+  /// Toggle my reaction on a message. [current] is the message's current
+  /// reactions map (emoji -> user ids).
+  Future<void> toggleReaction(
+    String messageId,
+    String emoji,
+    Map<String, List<String>> current,
+  ) =>
+      _guard(() async {
+        final me = uid!;
+        final next = {for (final e in current.entries) e.key: [...e.value]};
+        final list = next.putIfAbsent(emoji, () => <String>[]);
+        if (list.contains(me)) {
+          list.remove(me);
+          if (list.isEmpty) next.remove(emoji);
+        } else {
+          list.add(me);
+        }
+        await _c.from('messages').update({'reactions': next}).eq('id', messageId);
       }, null);
 }

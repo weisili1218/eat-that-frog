@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/providers.dart';
+import '../../data/remote/supabase_client.dart';
 import '../auth/auth_provider.dart';
 import '../settings/settings_provider.dart';
 import '../stats/stats_provider.dart';
@@ -14,11 +15,15 @@ final profileSyncProvider = Provider<void>((ref) {
   Future<void> pushProfile() async {
     final st = ref.read(statsProvider);
     final s = ref.read(settingsProvider);
+    final meta = SupabaseService.instance.user?.userMetadata;
+    final googlePhoto =
+        (meta?['avatar_url'] ?? meta?['picture']) as String?;
     await ref.read(socialRemoteProvider).upsertMyProfile(
           streak: st.streak,
           frogsEaten: st.frogsEaten,
           displayName: s.profileName.trim().isEmpty ? null : s.profileName.trim(),
           avatarColor: s.avatarColor,
+          avatarUrl: googlePhoto,
         );
     ref.read(socialRefreshProvider.notifier).state++;
   }

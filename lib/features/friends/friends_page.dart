@@ -631,7 +631,15 @@ class _ChatModalState extends ConsumerState<_ChatModal> {
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                       children: [
                         for (final m in list.reversed)
-                          _Bubble(text: m.text, mine: m.userId == myId, sender: byId[m.userId]),
+                          _Bubble(
+                            message: m,
+                            mine: m.userId == myId,
+                            sender: byId[m.userId],
+                            myId: myId,
+                            onReact: (emoji) => ref
+                                .read(socialRemoteProvider)
+                                .toggleReaction(m.id, emoji, m.reactions),
+                          ),
                       ],
                     ),
             ),
@@ -674,45 +682,133 @@ class _ChatModalState extends ConsumerState<_ChatModal> {
   }
 }
 
+const _reactionEmojis = ['👍', '💪', '🎉'];
+
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.text, required this.mine, this.sender});
-  final String text;
+  const _Bubble({
+    required this.message,
+    required this.mine,
+    required this.myId,
+    required this.onReact,
+    this.sender,
+  });
+  final ChatMessage message;
   final bool mine;
+  final String? myId;
   final Profile? sender;
+  final void Function(String emoji) onReact;
+
   @override
   Widget build(BuildContext context) {
+    // Activity posts (🐸 …) render centered with prominent reactions.
+    if (message.isActivity) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(color: AppColors.ivoryM, borderRadius: BorderRadius.circular(AppRadius.pill)),
+              child: Text('${sender != null && !mine ? '${sender!.displayName} ' : ''}${message.text}',
+                  style: AppText.mono(size: 10, color: AppColors.inkSoft, letterSpacing: 0)),
+            ),
+            const SizedBox(height: 6),
+            _ReactionRow(message: message, myId: myId, onReact: onReact),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!mine && sender != null) ...[
-            _Avatar(profile: sender!, size: 26),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                if (!mine && sender != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3, left: 2),
-                    child: Text(sender!.displayName, style: AppText.mono(size: 9, color: AppColors.cloud, letterSpacing: 0)),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: mine ? AppColors.accent : AppColors.ivoryM,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(text, style: AppText.body15(color: mine ? AppColors.ivoryL : AppColors.ink).copyWith(fontSize: 14)),
-                ),
+          Row(
+            mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!mine && sender != null) ...[
+                _Avatar(profile: sender!, size: 26),
+                const SizedBox(width: 8),
               ],
-            ),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    if (!mine && sender != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3, left: 2),
+                        child: Text(sender!.displayName, style: AppText.mono(size: 9, color: AppColors.cloud, letterSpacing: 0)),
+                      ),
+                    GestureDetector(
+                      onLongPress: () => onReact('👍'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: mine ? AppColors.accent : AppColors.ivoryM,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(message.text,
+                            style: AppText.body15(color: mine ? AppColors.ivoryL : AppColors.ink).copyWith(fontSize: 14)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          if (message.reactions.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: 4, left: mine ? 0 : 34),
+              child: _ReactionRow(message: message, myId: myId, onReact: onReact, compact: true),
+            ),
         ],
       ),
+    );
+  }
+}
+
+class _ReactionRow extends StatelessWidget {
+  const _ReactionRow({required this.message, required this.myId, required this.onReact, this.compact = false});
+  final ChatMessage message;
+  final String? myId;
+  final void Function(String emoji) onReact;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final emojis = compact
+        ? _reactionEmojis.where((e) => message.reactionCount(e) > 0).toList()
+        : _reactionEmojis;
+    return Wrap(
+      spacing: 6,
+      children: [
+        for (final e in emojis)
+          GestureDetector(
+            onTap: () => onReact(e),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: message.reactedBy(e, myId) ? AppColors.accent : AppColors.ivoryD,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(e, style: const TextStyle(fontSize: 13)),
+                  if (message.reactionCount(e) > 0) ...[
+                    const SizedBox(width: 4),
+                    Text('${message.reactionCount(e)}',
+                        style: AppText.mono(size: 10, color: AppColors.inkSoft, letterSpacing: 0)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -842,8 +938,20 @@ class _Avatar extends StatelessWidget {
             height: size,
             alignment: Alignment.center,
             decoration: BoxDecoration(color: profile.color, shape: BoxShape.circle),
-            child: Text(profile.initial,
-                style: AppText.body(color: AppColors.ivoryL).copyWith(fontSize: size * 0.42, fontWeight: FontWeight.w600)),
+            clipBehavior: Clip.antiAlias,
+            child: profile.hasPhoto
+                ? Image.network(
+                    profile.avatarUrl!,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Text(profile.initial,
+                        style: AppText.body(color: AppColors.ivoryL)
+                            .copyWith(fontSize: size * 0.42, fontWeight: FontWeight.w600)),
+                  )
+                : Text(profile.initial,
+                    style: AppText.body(color: AppColors.ivoryL)
+                        .copyWith(fontSize: size * 0.42, fontWeight: FontWeight.w600)),
           ),
           if (dot)
             Positioned(

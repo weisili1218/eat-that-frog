@@ -8,6 +8,7 @@ import '../../data/providers.dart';
 import '../auth/auth_page.dart';
 import '../auth/auth_provider.dart';
 import '../friends/models.dart';
+import '../stats/freeze_controller.dart';
 import 'settings_provider.dart';
 
 /// Full-screen Settings overlay (opened via the gear icon).
@@ -156,6 +157,15 @@ class SettingsOverlay extends ConsumerWidget {
                   label: s['simulateDayBtn'],
                   subtle: true,
                   onTap: () => ref.read(taskRepositoryProvider).simulateNextDay(),
+                ),
+                const SizedBox(height: 10),
+                _OutlineButton(
+                  label: s['simulateMissedDayBtn'],
+                  subtle: true,
+                  onTap: () {
+                    ref.read(freezeControllerProvider.notifier).simulateMiss();
+                    ref.read(settingsOpenProvider.notifier).state = false;
+                  },
                 ),
                 const SizedBox(height: 10),
                 _OutlineButton(

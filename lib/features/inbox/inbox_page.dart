@@ -12,6 +12,7 @@ import '../../shared/widgets/subtask_row.dart';
 import '../settings/settings_provider.dart';
 import 'inbox_provider.dart';
 import 'task_composer.dart';
+import 'task_planner.dart';
 
 class InboxPage extends ConsumerWidget {
   const InboxPage({super.key});
@@ -53,6 +54,8 @@ class InboxPage extends ConsumerWidget {
                     const SizedBox(height: 10),
                   ],
                   _NewTaskButton(label: s['newTaskBtn'], onTap: () => showTaskComposer(context)),
+                  const SizedBox(height: 10),
+                  _PlannerButton(label: s['plannerBtn'], onTap: () => showTaskPlanner(context)),
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -250,6 +253,34 @@ class _DashedPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PlannerButton extends StatelessWidget {
+  const _PlannerButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppColors.ivoryM,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.ivoryD),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.auto_awesome, size: 15, color: AppColors.ink),
+              const SizedBox(width: 8),
+              Text(label, style: AppText.button(color: AppColors.ink)),
+            ],
+          ),
+        ),
+      );
 }
 
 class _DueSoonBanner extends StatelessWidget {

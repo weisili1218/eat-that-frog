@@ -37,7 +37,7 @@ class _ComposerState extends ConsumerState<_Composer> {
 
   late Difficulty _difficulty = widget.editing?.difficulty ?? Difficulty.medium;
   late DateTime? _due = widget.editing?.dueDate;
-  late String? _reminder = widget.editing?.reminderTime;
+  late double _duration = (widget.editing?.durationMinutes ?? 30).toDouble();
   late List<Subtask> _subtasks = [...?widget.editing?.subtaskList];
 
   @override
@@ -68,19 +68,6 @@ class _ComposerState extends ConsumerState<_Composer> {
     if (picked != null) setState(() => _due = picked);
   }
 
-  Future<void> _pickReminder() async {
-    final parts = _reminder?.split(':');
-    final init = parts != null && parts.length == 2
-        ? TimeOfDay(hour: int.tryParse(parts[0]) ?? 9, minute: int.tryParse(parts[1]) ?? 0)
-        : const TimeOfDay(hour: 9, minute: 0);
-    final picked =
-        await showTimePicker(context: context, initialTime: init, builder: _pickerTheme);
-    if (picked != null) {
-      setState(() => _reminder =
-          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
-    }
-  }
-
   Widget _pickerTheme(BuildContext context, Widget? child) => Theme(
         data: Theme.of(context)
             .copyWith(colorScheme: const ColorScheme.light(primary: AppColors.accent)),
@@ -99,7 +86,7 @@ class _ComposerState extends ConsumerState<_Composer> {
         title: title,
         difficulty: _difficulty,
         dueDate: _due,
-        reminderTime: _reminder,
+        durationMinutes: _duration.round(),
         subtasks: _subtasks,
       );
     } else {
@@ -108,7 +95,7 @@ class _ComposerState extends ConsumerState<_Composer> {
         title: title,
         difficulty: _difficulty,
         dueDate: _due,
-        reminderTime: _reminder,
+        durationMinutes: _duration.round(),
         subtasks: _subtasks,
       );
     }
@@ -167,30 +154,33 @@ class _ComposerState extends ConsumerState<_Composer> {
                 ],
               ),
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetaButton(
-                      icon: Icons.event_outlined,
-                      label: _due == null
-                          ? s['dueLabel']
-                          : '${s['dueLabel']} ${_due!.toIso8601String().substring(0, 10)}',
-                      onTap: _pickDate,
-                      onClear: _due == null ? null : () => setState(() => _due = null),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _MetaButton(
-                      icon: Icons.access_time,
-                      label: _reminder == null ? s['reminderLabel'] : '${s['reminderLabel']} $_reminder',
-                      onTap: _pickReminder,
-                      onClear: _reminder == null ? null : () => setState(() => _reminder = null),
-                    ),
-                  ),
-                ],
+              _MetaButton(
+                icon: Icons.event_outlined,
+                label: _due == null
+                    ? s['dueLabel']
+                    : '${s['dueLabel']} ${_due!.toIso8601String().substring(0, 10)}',
+                onTap: _pickDate,
+                onClear: _due == null ? null : () => setState(() => _due = null),
               ),
               const SizedBox(height: 16),
+              Text('${s['durationLabel']} · ${_duration.round()} ${s['minutesSuffix']}',
+                  style: AppText.body15().copyWith(fontWeight: FontWeight.w500, fontSize: 13.5)),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: AppColors.accent,
+                  thumbColor: AppColors.accent,
+                  inactiveTrackColor: AppColors.ivoryD,
+                  overlayColor: AppColors.accent.withValues(alpha: 0.1),
+                ),
+                child: Slider(
+                  value: _duration.clamp(5, 180),
+                  min: 5,
+                  max: 180,
+                  divisions: 35,
+                  onChanged: (v) => setState(() => _duration = v),
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(s['composerSubtasksLabel'],
                   style: AppText.mono(size: 10, color: AppColors.cloud, letterSpacing: 0.1)),
               const SizedBox(height: 8),

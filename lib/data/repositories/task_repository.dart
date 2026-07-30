@@ -33,6 +33,7 @@ class TaskRepository {
     bool isFrog = false,
     DateTime? dueDate,
     String? reminderTime,
+    int? durationMinutes,
     List<Subtask> subtasks = const [],
   }) async {
     final now = DateTime.now();
@@ -47,6 +48,7 @@ class TaskRepository {
         everFrog: Value(isFrog),
         dueDate: Value(dueDate),
         reminderTime: Value(reminderTime),
+        durationMinutes: Value(durationMinutes),
         subtasks: Value(Subtask.encode(subtasks)),
         createdAt: now,
         updatedAt: now,
@@ -65,6 +67,7 @@ class TaskRepository {
     required Difficulty difficulty,
     DateTime? dueDate,
     String? reminderTime,
+    int? durationMinutes,
     required List<Subtask> subtasks,
   }) async {
     await _dao.updateFields(
@@ -74,6 +77,7 @@ class TaskRepository {
         difficulty: Value(difficulty),
         dueDate: Value(dueDate),
         reminderTime: Value(reminderTime),
+        durationMinutes: Value(durationMinutes),
         subtasks: Value(Subtask.encode(subtasks)),
         updatedAt: Value(DateTime.now()),
         pendingSync: const Value(true),

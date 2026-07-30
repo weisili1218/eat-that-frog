@@ -4,7 +4,10 @@ import 'package:intl/intl.dart';
 
 import '../../core/navigation.dart';
 import '../../core/theme.dart';
+import '../../data/local/database.dart';
+import '../../data/local/task_x.dart';
 import '../../data/providers.dart';
+import '../friends/friends_provider.dart';
 import '../inbox/task_composer.dart';
 import '../../shared/animations/fade_up.dart';
 import '../../shared/widgets/frog_card.dart';
@@ -13,6 +16,7 @@ import '../../shared/widgets/tab_bar.dart';
 import '../../shared/widgets/tadpole_row.dart';
 import '../settings/settings_provider.dart';
 import '../stats/stats_provider.dart';
+import '../stats/freeze_controller.dart';
 import 'focus_controller.dart';
 import 'today_provider.dart';
 
@@ -26,6 +30,7 @@ class TodayPage extends ConsumerWidget {
     final tadpoles = ref.watch(todayTadpolesProvider);
     final isEmpty = ref.watch(todayEmptyProvider);
     final streak = ref.watch(statsProvider).streak;
+    final freeze = ref.watch(freezeControllerProvider);
     final focus = ref.watch(focusControllerProvider);
     final focusedId = focus.taskId;
     final expandedId = ref.watch(expandedTaskProvider);
@@ -61,12 +66,24 @@ class TodayPage extends ConsumerWidget {
                   // Leave room for the top-right gear icon (in the shell).
                   Padding(
                     padding: const EdgeInsets.only(top: 40),
-                    child: StreakBadge(streak: streak, strings: s),
+                    child: Row(
+                      children: [
+                        _FreezePill(count: freeze.tokens),
+                        const SizedBox(width: 8),
+                        StreakBadge(streak: streak, strings: s),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
           ),
+
+          if (freeze.notice != null)
+            _FreezeNotice(
+              text: freeze.notice!,
+              onDismiss: () => ref.read(freezeControllerProvider.notifier).dismissNotice(),
+            ),
 
           if (focusMode)
             _FocusBanner(
@@ -95,7 +112,7 @@ class TodayPage extends ConsumerWidget {
                         focused: focusedId == frogs[i].id,
                         dimmed: focusMode && focusedId != frogs[i].id,
                         strings: s,
-                        onToggleDone: () => repo.toggleDone(frogs[i]),
+                        onToggleDone: () => _completeFrog(ref, frogs[i]),
                         onUnfrog: () => repo.setFrog(frogs[i].id, false),
                         onEdit: () => showTaskComposer(context, editing: frogs[i]),
                         onFocus: () => _toggleFocus(ref, frogs[i].id),
@@ -144,9 +161,76 @@ class TodayPage extends ConsumerWidget {
     ref.read(focusControllerProvider.notifier).start(id); // start() toggles off if same
   }
 
+  /// Mark a frog done and, if it just became done, post to the group chat.
+  Future<void> _completeFrog(WidgetRef ref, Task frog) async {
+    final wasDone = frog.done;
+    await ref.read(taskRepositoryProvider).toggleDone(frog);
+    if (!wasDone) {
+      final communities = ref.read(communitiesProvider).valueOrNull ?? const [];
+      if (communities.isNotEmpty) {
+        await ref
+            .read(socialRemoteProvider)
+            .sendMessage(communities.first['id'] as String, '🐸 完成了今天的青蛙！');
+      }
+    }
+  }
+
   void _toggleExpand(WidgetRef ref, String id) {
     final cur = ref.read(expandedTaskProvider);
     ref.read(expandedTaskProvider.notifier).state = cur == id ? null : id;
+  }
+}
+
+class _FreezePill extends StatelessWidget {
+  const _FreezePill({required this.count});
+  final int count;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.ivoryM,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('🛡️', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 5),
+          Text('$count', style: AppText.mono(size: 11, color: AppColors.inkSoft, letterSpacing: 0)),
+        ],
+      ),
+    );
+  }
+}
+
+class _FreezeNotice extends StatelessWidget {
+  const _FreezeNotice({required this.text, required this.onDismiss});
+  final String text;
+  final VoidCallback onDismiss;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(text, style: AppText.body15(color: AppColors.ink).copyWith(fontSize: 13))),
+          GestureDetector(
+            onTap: onDismiss,
+            behavior: HitTestBehavior.opaque,
+            child: const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.close, size: 15, color: AppColors.inkSoft),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

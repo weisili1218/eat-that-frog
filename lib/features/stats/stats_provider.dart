@@ -4,6 +4,7 @@ import '../../core/enums.dart';
 import '../../data/local/database.dart';
 import '../../data/providers.dart';
 import '../settings/settings_provider.dart';
+import 'freeze_controller.dart';
 
 class DayBar {
   const DayBar({
@@ -48,6 +49,7 @@ final statsProvider = Provider<StatsData>((ref) {
   final completions =
       ref.watch(allCompletionsProvider).valueOrNull ?? const <Completion>[];
   final leaveEnabled = ref.watch(settingsProvider).leaveEnabled;
+  final frozenDays = ref.watch(freezeControllerProvider).usedDays;
 
   final now = DateTime.now();
   final today = _day(now);
@@ -61,9 +63,11 @@ final statsProvider = Provider<StatsData>((ref) {
   final denom = everFrog == 0 ? 0 : (everFrog > frogsEaten ? everFrog : frogsEaten);
   final frogRate = denom == 0 ? 0 : ((frogsEaten / denom) * 100).round();
 
-  bool frogOn(DateTime day) => completions.any(
-      (c) => c.type == CompletionType.frog && _sameDay(c.date, day));
-  final frogDoneToday = frogOn(today);
+  bool frogOn(DateTime day) =>
+      frozenDays.contains(freezeDayKey(day)) ||
+      completions.any((c) => c.type == CompletionType.frog && _sameDay(c.date, day));
+  final frogDoneToday =
+      completions.any((c) => c.type == CompletionType.frog && _sameDay(c.date, today));
 
   // Streak: consecutive days (ending today or yesterday) with a frog, with an
   // optional single "leave" day forgiven per calendar month.

@@ -8,6 +8,7 @@ class Profile {
     required this.avatarColor,
     required this.streak,
     required this.frogsEaten,
+    this.avatarUrl,
     this.focusTask,
     this.focusStartedAt,
   });
@@ -17,8 +18,11 @@ class Profile {
   final String avatarColor;
   final int streak;
   final int frogsEaten;
+  final String? avatarUrl;
   final String? focusTask;
   final DateTime? focusStartedAt;
+
+  bool get hasPhoto => avatarUrl != null && avatarUrl!.isNotEmpty;
 
   bool get isFocusing => focusStartedAt != null;
 
@@ -41,6 +45,7 @@ class Profile {
             ? m['display_name'] as String
             : '青蛙夥伴',
         avatarColor: (m['avatar_color'] as String?) ?? '#B5502E',
+        avatarUrl: m['avatar_url'] as String?,
         streak: (m['streak'] as num?)?.toInt() ?? 0,
         frogsEaten: (m['frogs_eaten'] as num?)?.toInt() ?? 0,
         focusTask: m['focus_task'] as String?,
@@ -57,6 +62,7 @@ class ChatMessage {
     required this.userId,
     required this.text,
     required this.createdAt,
+    this.reactions = const {},
   });
 
   final String id;
@@ -64,13 +70,32 @@ class ChatMessage {
   final String text;
   final DateTime createdAt;
 
-  factory ChatMessage.fromMap(Map<String, dynamic> m) => ChatMessage(
-        id: m['id'] as String,
-        userId: m['user_id'] as String,
-        text: (m['text'] as String?) ?? '',
-        createdAt: DateTime.tryParse(m['created_at'] as String? ?? '')?.toLocal() ??
-            DateTime.now(),
-      );
+  /// emoji -> list of user ids who reacted.
+  final Map<String, List<String>> reactions;
+
+  bool get isActivity => text.startsWith('🐸');
+
+  int reactionCount(String emoji) => reactions[emoji]?.length ?? 0;
+  bool reactedBy(String emoji, String? uid) =>
+      uid != null && (reactions[emoji]?.contains(uid) ?? false);
+
+  factory ChatMessage.fromMap(Map<String, dynamic> m) {
+    final raw = m['reactions'];
+    final parsed = <String, List<String>>{};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        if (v is List) parsed[k.toString()] = v.map((e) => e.toString()).toList();
+      });
+    }
+    return ChatMessage(
+      id: m['id'] as String,
+      userId: m['user_id'] as String,
+      text: (m['text'] as String?) ?? '',
+      createdAt:
+          DateTime.tryParse(m['created_at'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      reactions: parsed,
+    );
+  }
 }
 
 /// Avatar palette offered in the profile editor.

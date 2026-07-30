@@ -27,6 +27,9 @@ class Tasks extends Table {
   DateTimeColumn get dueDate => dateTime().nullable()();
   TextColumn get reminderTime => text().nullable()();
 
+  /// Estimated duration in minutes (drives the auto-planner).
+  IntColumn get durationMinutes => integer().nullable()();
+
   /// JSON array of {id,title,done}. See [Subtask].
   TextColumn get subtasks => text().withDefault(const Constant('[]'))();
 
@@ -75,7 +78,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -94,6 +97,9 @@ class AppDatabase extends _$AppDatabase {
             );
             // daily_records is no longer used.
             await customStatement('DROP TABLE IF EXISTS daily_records');
+          }
+          if (from < 3) {
+            await m.addColumn(tasks, tasks.durationMinutes);
           }
         },
       );
