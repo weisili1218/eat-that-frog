@@ -25,3 +25,12 @@ android/app/google-services.json
 
 # Local Supabase creds (do not commit)
 scripts/run_local.sh
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+**/ephemeral/
