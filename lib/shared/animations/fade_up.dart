@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 
@@ -30,6 +32,9 @@ class _FadeUpState extends State<FadeUp> with SingleTickerProviderStateMixin {
   late final Animation<double> _curved =
       CurvedAnimation(parent: _c, curve: AppMotion.fadeUpCurve);
 
+  /// Cancellable so the stagger delay never outlives the widget.
+  Timer? _startTimer;
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +42,7 @@ class _FadeUpState extends State<FadeUp> with SingleTickerProviderStateMixin {
     if (total == Duration.zero) {
       _c.forward();
     } else {
-      Future<void>.delayed(total, () {
+      _startTimer = Timer(total, () {
         if (mounted) _c.forward();
       });
     }
@@ -45,6 +50,7 @@ class _FadeUpState extends State<FadeUp> with SingleTickerProviderStateMixin {
 
   @override
   void dispose() {
+    _startTimer?.cancel();
     _c.dispose();
     super.dispose();
   }

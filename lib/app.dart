@@ -10,6 +10,7 @@ import 'features/stats/stats_page.dart';
 import 'features/friends/friends_page.dart';
 import 'features/friends/profile_sync.dart';
 import 'features/stats/freeze_award.dart';
+import 'features/stats/day_rollover.dart';
 import 'features/settings/settings_page.dart';
 import 'features/inbox/inbox_provider.dart';
 import 'features/settings/settings_provider.dart';
@@ -30,6 +31,7 @@ class RootShell extends ConsumerWidget {
     ref.watch(notificationSchedulerProvider);
     ref.watch(profileSyncProvider);
     ref.watch(freezeAwardProvider);
+    ref.watch(dayRolloverProvider);
 
     // If Friends is off but somehow selected, fall back to Today.
     if (!friendsEnabled && tab == AppTab.friends) tab = AppTab.today;

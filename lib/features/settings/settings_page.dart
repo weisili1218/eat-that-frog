@@ -62,7 +62,7 @@ class SettingsOverlay extends ConsumerWidget {
                     trailingText: user != null ? s['signOut'] : null,
                     onTap: () async {
                       if (user != null) {
-                        await ref.read(authControllerProvider).signOut();
+                        await _confirmSignOut(context, ref, s);
                       } else {
                         await showAuthSheet(context);
                       }
@@ -207,6 +207,37 @@ class SettingsOverlay extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Sign out, flushing pending changes then clearing local data so the next
+  /// account on this device never inherits (or re-uploads) the previous one's
+  /// tasks.
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref, AppStrings s) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.ivoryL,
+        title: Text(s['signOut'], style: AppText.cardTitle().copyWith(fontSize: 17)),
+        content: Text(s['signOutBody'], style: AppText.body15(color: AppColors.inkSoft)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(s['cancel'], style: AppText.button(color: AppColors.inkSoft)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s['signOut'], style: AppText.button(color: AppColors.accent)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    // Best-effort: push anything still pending before we drop the local copy.
+    await ref.read(syncServiceProvider)?.syncNow();
+    await ref.read(taskRepositoryProvider).resetAll();
+    await ref.read(completionRepositoryProvider).resetAll();
+    await ref.read(authControllerProvider).signOut();
   }
 
   Future<void> _confirmReset(BuildContext context, WidgetRef ref, AppStrings s) async {

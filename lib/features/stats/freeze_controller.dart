@@ -103,6 +103,51 @@ class FreezeController extends StateNotifier<FreezeState> {
     _persist();
   }
 
+  /// Day-rollover check: for each past day the user missed since we last
+  /// looked, spend a token to protect the streak (most recent day first).
+  /// Runs on launch and on resume — this is what makes freeze tokens real.
+  ///
+  /// [hadFrogOn] answers "was a frog completed on this day?".
+  void applyMissedDays(bool Function(DateTime day) hadFrogOn) {
+    if (!state.loaded) return;
+    final today = DateTime.now();
+    final todayKey = freezeDayKey(today);
+    final last = _p?.getString('freeze_last_check');
+    if (last == todayKey) return; // already reconciled today
+
+    var tokens = state.tokens;
+    final used = {...state.usedDays};
+    String? notice;
+    var spent = 0;
+
+    // Walk back from yesterday. Stop at the first day we can't cover: the
+    // streak is broken there anyway, so older days don't matter.
+    for (var i = 1; i <= 30; i++) {
+      final day = today.subtract(Duration(days: i));
+      final key = freezeDayKey(day);
+      if (used.contains(key) || hadFrogOn(day)) break; // day is already covered
+      if (tokens <= 0) {
+        notice = spent > 0 ? null : '沒有保護券了 —— 連勝重新開始，下次再衝！';
+        break;
+      }
+      tokens -= 1;
+      used.add(key);
+      spent += 1;
+    }
+
+    if (spent > 0) {
+      notice = spent == 1
+          ? '連勝保護券已自動使用，連勝延續！🛡️'
+          : '已自動使用 $spent 張保護券，連勝延續！🛡️';
+    }
+
+    if (spent > 0 || notice != null) {
+      state = state.copyWith(tokens: tokens, usedDays: used, notice: notice);
+      _persist();
+    }
+    _p?.setString('freeze_last_check', todayKey);
+  }
+
   void dismissNotice() => state = state.copyWith(notice: null);
 }
 

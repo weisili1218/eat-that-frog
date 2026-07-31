@@ -25,14 +25,15 @@ class _PlanItem {
     required this.difficulty,
     required this.minutes,
     required this.isFrog,
-    this.selected = true,
   });
   final String id;
   final String title;
   final Difficulty difficulty;
   final int minutes;
   final bool isFrog;
-  bool selected;
+
+  /// Ticked in the result list; everything is proposed as selected.
+  bool selected = true;
 }
 
 class _PlannerSheet extends ConsumerStatefulWidget {
